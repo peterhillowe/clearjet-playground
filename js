@@ -30,7 +30,9 @@ function haversineDistance(coord1, coord2) {
   return R * c;
 }
 
-// Mapping for multi‑leg journeys (non‑Canadian international origins).
+// Updated mapping for multi‑leg journeys: all international origins (except Canadian ones)
+// that require a multi‑leg path now map to their injection anchor.
+// Hong Kong, Narita, Kansai, Fukuoka, Shanghai Pudong, Beijing Capital, Xi'an, Chengdu, Kunming all route to LAX.
 const intlToDom = {
   "BER": "JFK",
   "BRU": "JFK",
@@ -44,7 +46,15 @@ const intlToDom = {
   "MXP": "JFK",
   "ORY": "JFK",
   "TIJ": "SAN",
-  "HKG": "LAX"
+  "HKG": "LAX",
+  "NRT": "LAX",
+  "KIX": "LAX",
+  "FUK": "LAX",
+  "PVG": "LAX",
+  "PEK": "LAX",
+  "XIY": "LAX",
+  "CTU": "LAX",
+  "KMG": "LAX"
 };
 
 // Set of Canadian airport codes (non-stop routing).
@@ -136,8 +146,7 @@ const routeLayerId = 'route-lines';
 // Use click events for flight route drawing.
 let selectedId = null;
 
-// Helper: Compute and display routes for a given feature.
-// (Routing logic remains the same as before.)
+// Helper: Compute and display routes for a given feature, then center the view.
 function showRoutesForFeature(feature) {
   const code = feature.properties.code;
   const originCoord = feature.geometry.coordinates;
@@ -179,7 +188,7 @@ function showRoutesForFeature(feature) {
       }
     }
   } else if (originType === 'domestic') {
-    // Domestic routing: nonstop routes from the domestic origin to every other domestic airport (>=600 miles).
+    // Domestic routing: nonstop routes from origin to every other domestic airport (>=600 miles).
     const domesticDests = airportData.features.filter(f =>
       f.properties.origin === 'domestic' &&
       f.properties.code !== code &&
@@ -271,6 +280,7 @@ map.on('load', function () {
   
   // Set up click behavior to draw flight routes.
   map.on('click', 'airport-layer', function(e) {
+    // Prevent the click from propagating to the map background.
     e.originalEvent.stopPropagation();
     const feature = e.features[0];
     // If a different airport was previously selected, clear its state.
@@ -284,7 +294,7 @@ map.on('load', function () {
     showRoutesForFeature(feature);
   });
   
-  // Clicking on the background clears the selection and routes.
+  // Clicking on the map (non-marker) clears the selection and routes.
   map.on('click', function(e) {
     const features = map.queryRenderedFeatures(e.point, { layers: ['airport-layer'] });
     if (!features.length && selectedId) {
